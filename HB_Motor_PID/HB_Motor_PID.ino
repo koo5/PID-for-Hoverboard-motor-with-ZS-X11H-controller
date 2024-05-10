@@ -139,7 +139,7 @@ float PID(){
 
   //I = constrain((target/speed)*15, 0, 255);
   
-  if (error/speed > 10)
+  if (error/speed > 20)
   {
     if (speed < 3)
       P += 200;
