@@ -13,7 +13,7 @@ unsigned long now, prvTime, dt;
 
 float P=0.00, I=0.00, D=0.00, error=0.00, errDiff=0.00, prevErr=0.00, maxSum=200, errSum=0.00, pid=0.00;
 
-float kp=0.2, ki=0.2, kd=0.1;
+float kp=1, ki=1, kd=0.5;
 
 unsigned long tic=0,tac=0;
 
@@ -24,7 +24,13 @@ long target=0;
 
 void setup() {
   Serial.begin(115200);
-Serial.println();Serial.println();Serial.println();Serial.println();Serial.println();Serial.println();Serial.println();Serial.println();Serial.println();
+  
+  for (long i = 0; i < 1000; i++)
+    Serial.println("!start");
+
+  Legend();
+  
+  /**/
   pinMode(pb,INPUT_PULLUP);                                               // Start pgm button
   
   /* autopilot button to ground */
@@ -40,12 +46,36 @@ Serial.println();Serial.println();Serial.println();Serial.println();Serial.print
 
 }
 
-int state = 2;
+int state = 0;
 
 void next_state()
 {
   switch(state)
   {
+    case -3:
+    {    
+      target = 300000;
+      state = -2;
+    }
+    break;
+    case -2:
+    {    
+      target -= dt / 100;
+      if (target <= 10000)
+      {
+        state = -1;
+      }
+    }
+    break;
+    case -1:
+    {
+      target += dt / 100;
+      if (target >= 300000)
+      {
+        state = -2;
+      }
+    }  
+    break;  
     case 0:
     {    
       if (pot <= 500)
@@ -85,14 +115,14 @@ void next_state()
 }
 
 void loop() {
-  pot = analogRead(A7);
 
-  next_state();
-  
+  pot = constrain(analogRead(A7)-10,0, 1023);
   now = micros();
-  
   dt = (now - prvTime); 
   prvTime = now;
+
+  next_state();
+
 
 noInterrupts();
   bum_delta = max(tic-tac, now - tic);
@@ -101,7 +131,7 @@ interrupts();
    
   pid = PID();                                        
   
-  analogWrite(PWM_PIN_OUT, round(constrain(pid,0,255)) );
+  analogWrite(PWM_PIN_OUT, constrain(pid,0,255)) ;
   Plotter();                                             
   //Trace();                                             
 }
@@ -113,52 +143,48 @@ void intrupt(){
 
 float PID(){
 
-  error = (bum_delta - target)/1000;
+  error = 0-(target-bum_delta)/1000;
 
-  P = kp * error;
+  P = constrain(kp * error, 0, 255);
 
-  errSum = errSum + (error * dt);
+  errSum = errSum * 0.95 + (error * dt/10000);
   errSum = constrain( errSum, -maxSum, maxSum );
 
   I = ki * errSum; 
-  D = kd * (error - prevErr) / (dt);  prevErr = error;
-
+  D = kd * ((error - prevErr) * 10000 / dt);
+  prevErr = error;
+  
   return P + I + D;
+  
 }
 
 
 
+
+
+
+void Legend()
+{
+  Serial.println("#pot,target,bum_delta,error,errSum,P,I,D,pid,state");
+}
+
+int legend_intersperser = 0;
 void Plotter(){
-  Serial.print("nula:"); Serial.print(0);       
-  //Serial.print(" tic:"); Serial.print(tic);
-  //Serial.print(" tac:"); Serial.print(tac);
-  //Serial.print(" pot:"); Serial.print(pot);
-  Serial.print(" error:"); Serial.print(error);
-  Serial.print(" target:"); Serial.print(target/1000);
-  Serial.print(" bum_delta:"); Serial.print(bum_delta/1000);
-  Serial.print(" pid:"); Serial.print(pid);
-  Serial.print(" state:"); Serial.print(state * 100);
-  //Serial.print(500);
+  
+  if (legend_intersperser++ % 1000 == 0)
+    Legend();
+   
+  //Serial.print(tic);
+  //Serial.print(tac);
+  Serial.print(pot);  Serial.print(',');
+  Serial.print(target/1000);Serial.print(',');
+  Serial.print(bum_delta/1000);Serial.print(',');
+  Serial.print(error);  Serial.print(',');
+  Serial.print(errSum);  Serial.print(',');
+  Serial.print(P);  Serial.print(',');
+  Serial.print(I);  Serial.print(',');
+  Serial.print(D);  Serial.print(',');
+  Serial.print(pid);  Serial.print(',');
+  Serial.print(state * 100);  Serial.print(',');
   Serial.println();
-}
-
-void Trace(){
-  Serial.print(String() + "\n" 
-//                        + "now: "    + now
-//                        + " \tlbrt: "    + last_bum_reset_time
-//                        + " \tbum:  "    + bum
-                        + " \tpot: "    + pot
-                        + " \ttarget: "    + target
-                        + " \tbd: "  + String(bum_delta)
-//                        + " \tspeed2: "  + String(speed2)
-                        + " \tpid: "       + String(pid)
-                        + " \terror: "     + String(error)
-                        + " \tprevErr: "   + String(prevErr)
-                        + " \terrSum: "    + String(errSum)
-                        + " P: "         + String(P)
-                        + " I: "         + String(I)
-                        + " D: "         + String(D)
-//                        + "  dir: "       + dir
-                        + " dt: "        + String(dt)
-                        );
 }
