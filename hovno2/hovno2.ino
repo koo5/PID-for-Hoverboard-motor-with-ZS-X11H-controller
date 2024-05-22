@@ -1,3 +1,6 @@
+#include <movingAvg.h>                  // https://github.com/JChristensen/movingAvg
+
+
 
 int DIR_PIN_BT = A2;                        // Direction button 
 int DIR_PIN_OUT = 10;                       // Direction Output
@@ -5,7 +8,10 @@ int HALL_PIN = 2;                           // interrupt feedback pin
 int PWM_PIN_OUT = 3;                        // 490Hz PWM Output
 
 
-float pot;
+movingAvg speed_mvavg(10);                // define the moving average object
+movingAvg pot_mvavg(10);                // define the moving average object
+
+int pot;
 
 unsigned long now, prvTime, dt;
 
@@ -16,7 +22,7 @@ unsigned long tic=0,tac=0;
 long bum_delta = 0;
 float output = 0;
 long target = 0;
-long speed = 0;
+int speed = 0;
 long last_dir_change = 0;
 
 int last_hals = 0;
@@ -83,9 +89,9 @@ void next_state()
       if (pot <= 500)
         target = map(pot, 100, 500, 0, 1000);
       else
-        target = map(pot, 500, 1023, 1000, 20000);
+        target = map(pot, 500, 1023, 1000, 37000);
 
-      target = constrain(target, 0, 20000);
+      target = constrain(target, 0, 37000);
 
       /*if (digitalRead(A1) == 0)
       {
@@ -119,7 +125,7 @@ void next_state()
 
 void loop() {
 
-  pot = 0.9*pot + 0.1*constrain(analogRead(A7)-10,0, 1023);
+  pot = pot_mvavg.reading(constrain(analogRead(A7)-10,0, 1023));
   now = micros();
   dt = (now - prvTime); 
   prvTime = now;
@@ -134,10 +140,11 @@ interrupts();
   bum_delta = max(tic2-tac2, now - tic2);
   bum_delta = constrain(bum_delta, 1, 500000);
   speed = 100000000 / bum_delta - 200; /* cca 200 - 20000 bpk */
-  speed = constrain(speed * dir, 0, 20000);
+  speed = speed_mvavg.reading(constrain(speed * dir, 0, 37000));
   
+
   /* ignore oscillations when wheel is stuck */
-  if (now - last_dir_change < 1000 * 30)
+  if (now - last_dir_change < 1000 * 50)
     speed = 0;
    
   pid = PID();                                        
@@ -245,7 +252,7 @@ float PID(){
   P = 0;//0.1 * error;
 
 
-  errSum = errSum + (error * dt/10000000);
+  errSum = errSum + (error * dt/1000000);
   errSum = constrain( errSum, 0, 255 );
   I = errSum;
 
@@ -256,8 +263,6 @@ float PID(){
   return I;
   
 }
-
-
 
 
 
