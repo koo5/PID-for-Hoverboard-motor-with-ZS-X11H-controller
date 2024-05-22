@@ -17,7 +17,7 @@ long bum_delta = 0;
 float output = 0;
 long target = 0;
 long speed = 0;
-
+long last_dir_change = 0;
 
 int last_hals = 0;
 int dir = 0;
@@ -81,7 +81,7 @@ void next_state()
     case 0:
     {    
       if (pot <= 500)
-        target = map(pot, 0, 500, 0, 1000);
+        target = map(pot, 100, 500, 0, 1000);
       else
         target = map(pot, 500, 1023, 1000, 20000);
 
@@ -135,6 +135,10 @@ interrupts();
   bum_delta = constrain(bum_delta, 1, 500000);
   speed = 100000000 / bum_delta - 200; /* cca 200 - 20000 bpk */
   speed = constrain(speed * dir, 0, 20000);
+  
+  /* ignore oscillations when wheel is stuck */
+  if (now - last_dir_change < 1000 * 30)
+    speed = 0;
    
   pid = PID();                                        
   
@@ -151,13 +155,27 @@ void intrupt(){
   tic = micros();
 
   int new_dir = get_dir();
-  if (new_dir != 0)
+  if (new_dir != dir)
+  {
+    last_dir_change = tic;
     dir = new_dir;
+  }
+  
   last_hals = hals;
 }
 
+
+
+
+/*
+The bldc motor with 3 hall sensors sends out a pulse every time one of the hall sensors output flips, and we have an interrupt handler for that. In addition, each of the 3 hall sensor outputs is connected to a digital input pin. In the interrupt handler code, we store the current state of hall sensors in a variable, compare to the previous state, and decide what direction the motor is spinning. */
+
+int hal_magic = 0;
+
 int get_dir()
 {
+//  Serial.print("#get_dir: ");
+
   int d7 = digitalRead(7);
   int d6 = digitalRead(6);
   int d5 = digitalRead(5);
@@ -169,50 +187,53 @@ int get_dir()
   if(hals == last_hals)
     return 0;
   
-  switch(hals | (last_hals << 3))
+  hal_magic = hals | (last_hals << 3);
+
+  switch(hal_magic)
   {
-    case 0b100110:
-      return 1;
+
+  /* left to right */
+   /* no tail */
     case 0b100010:
-      return 1;
-    case 0b100001:
-      return -1;
-    case 0b100011:
-      return -1;
-
-
-    case 0b010110:
-      return 1;
-    case 0b010010:
-      return 1;
     case 0b010001:
-      return -1;
-    case 0b010011:
-      return -1;
-
-
-      
-    case 0b110010:
-      return 1;
-    case 0b110001:
-      return -1;
-    case 0b010001:
-      return -1;
-    case 0b010100:
-      return 1;
-      
-    case 0b010011:
-      return 1;
-    case 0b010110:
-      return -1;
-      
-    case 0b001011:
-      return -1;
     case 0b001100:
+   /* new state has tail */
+    case 0b100110:
+    case 0b010011:
+    case 0b001101:
+   /* tail catches up */
+    case 0b101100:
+    case 0b110010:
+    case 0b011001:
+  /* both tails */
+    case 0b101110:
+    case 0b110011:
+    case 0b011101:
       return 1;
-    case 0b001110:
-      return 1;
+  /* right to left */
+  /* no tail */
+    case 0b100001:
+    case 0b010100:
+    case 0b001010:
+  /* new state has tail */
+    case 0b100101:
+    case 0b010110:
+    case 0b001011:
+   /* tail catches up */
+    case 0b110100:
+    case 0b011010:
+    case 0b101001:
+  /* both tails */
+    case 0b110101:
+    case 0b011110:
+    case 0b101011:
+      return -1;
+
   }
+
+  Serial.print("#Unknown stateb: ");
+  Serial.println(hal_magic);
+
   return 0;  
 }
 
@@ -224,7 +245,7 @@ float PID(){
   P = 0;//0.1 * error;
 
 
-  errSum = errSum + (error * dt/100000000);
+  errSum = errSum + (error * dt/10000000);
   errSum = constrain( errSum, 0, 255 );
   I = errSum;
 
@@ -244,10 +265,11 @@ float PID(){
 void Legend()
 {
 //  Serial.println("#pot,target,bum_delta,speed,dir,error,errSum,P,I,D,pid,state");
-  Serial.println("#target,speed,dir,error,errSum,I,pid,state");
+  Serial.println("##last_dir_change,target,speed,dir,error,errSum,P,I,D,pid,state,hal_magic");
 }
 
 int legend_intersperser = 0;
+
 void Plotter(){
   
   if (legend_intersperser++ % 1000 == 0)
@@ -256,16 +278,19 @@ void Plotter(){
   //Serial.print(tic);
   //Serial.print(tac);
   //Serial.print(pot);  Serial.print(',');
+  Serial.print(last_dir_change);Serial.print(',');
+  
   Serial.print(target);Serial.print(',');
   //Serial.print(bum_delta);Serial.print(',');
   Serial.print(speed);Serial.print(',');
   Serial.print(dir);Serial.print(',');
   Serial.print(error);  Serial.print(',');
   Serial.print(errSum);  Serial.print(',');
-  //Serial.print(P);  Serial.print(',');
+  Serial.print(P);  Serial.print(',');
   Serial.print(I);  Serial.print(',');
-  //Serial.print(D);  Serial.print(',');
+  Serial.print(D);  Serial.print(',');
   Serial.print(pid);  Serial.print(',');
   Serial.print(state * 100);  Serial.print(',');
+  Serial.print(hal_magic);  Serial.print(',');
   Serial.println();
 }
