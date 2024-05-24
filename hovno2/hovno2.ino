@@ -22,7 +22,7 @@ unsigned long tic=0,tac=0;
 long bum_delta = 0;
 float output = 0;
 long target = 0;
-int speed = 0;
+long speed = 0;
 long last_dir_change = 0;
 
 int last_hals = 0;
@@ -89,9 +89,9 @@ void next_state()
       if (pot <= 500)
         target = map(pot, 100, 500, 0, 1000);
       else
-        target = map(pot, 500, 1023, 1000, 37000);
+        target = map(pot, 500, 1023, 1000, 200000);
 
-      target = constrain(target, 0, 37000);
+      target = constrain(target, 0, 200000);
 
       /*if (digitalRead(A1) == 0)
       {
@@ -104,7 +104,7 @@ void next_state()
     
     if (digitalRead(A1) == 1)
     {
-      target = 300000;
+      target = 0;
       state = 2;
     }
     break;
@@ -125,7 +125,11 @@ void next_state()
 
 void loop() {
 
-  pot = pot_mvavg.reading(constrain(analogRead(A7)-10,0, 1023));
+  int rrr = analogRead(A7)-10;
+  rrr = constrain(rrr, 0, 1023);
+  //pot = pot_mvavg.reading(rrr);
+  pot = rrr;
+  
   now = micros();
   dt = (now - prvTime); 
   prvTime = now;
@@ -137,15 +141,23 @@ noInterrupts();
   unsigned long tac2 = tac;
 interrupts();
 
-  bum_delta = max(tic2-tac2, now - tic2);
-  bum_delta = constrain(bum_delta, 1, 500000);
-  speed = 100000000 / bum_delta - 200; /* cca 200 - 20000 bpk */
-  speed = speed_mvavg.reading(constrain(speed * dir, 0, 37000));
+  long bum_delta_new = max(tic2-tac2, now - tic2);
+  bum_delta_new = constrain(bum_delta_new, 1000, 500000);
+  
+  if (bum_delta_new == 1)
+    bum_delta_new = bum_delta;
+
+  bum_delta = bum_delta_new;
+  
+  speed = dir * (100000000 / bum_delta - 200); /* cca 200 - 20000 bpk */
+  //     2147483648
+  speed = constrain((speed * dir), 0, 500000);
+  //speed_mvavg.reading();
   
 
   /* ignore oscillations when wheel is stuck */
-  if (now - last_dir_change < 1000 * 50)
-    speed = 0;
+  /*if (now - last_dir_change < 1000 * 15)
+    speed = 0;*/
    
   pid = PID();                                        
   
@@ -252,15 +264,15 @@ float PID(){
   P = 0;//0.1 * error;
 
 
-  errSum = errSum + (error * dt/1000000);
+  errSum = errSum + (error * dt/10000000);
   errSum = constrain( errSum, 0, 255 );
   I = errSum;
 
 
-  D = 1 * ((error - prevErr) * 10000 / dt);
+  D = 0.01 * ((error - prevErr) * 10000 / dt);
   prevErr = error;
   
-  return I;
+  return I + D;
   
 }
 
@@ -270,7 +282,7 @@ float PID(){
 void Legend()
 {
 //  Serial.println("#pot,target,bum_delta,speed,dir,error,errSum,P,I,D,pid,state");
-  Serial.println("##last_dir_change,target,speed,dir,error,errSum,P,I,D,pid,state,hal_magic");
+  Serial.println("##last_dir_change,pot,target,bum_delta,speed,dir,error,errSum,P,I,D,pid,state,hal_magic");
 }
 
 int legend_intersperser = 0;
@@ -284,9 +296,9 @@ void Plotter(){
   //Serial.print(tac);
   //Serial.print(pot);  Serial.print(',');
   Serial.print(last_dir_change);Serial.print(',');
-  
+  Serial.print(pot);Serial.print(',');
   Serial.print(target);Serial.print(',');
-  //Serial.print(bum_delta);Serial.print(',');
+  Serial.print(bum_delta);Serial.print(',');
   Serial.print(speed);Serial.print(',');
   Serial.print(dir);Serial.print(',');
   Serial.print(error);  Serial.print(',');
