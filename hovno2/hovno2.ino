@@ -142,9 +142,9 @@ noInterrupts();
 interrupts();
 
   long bum_delta_new = max(tic2-tac2, now - tic2);
-  bum_delta_new = constrain(bum_delta_new, 1000, 500000);
+  bum_delta_new = constrain(bum_delta_new, 1, 500000);
   
-  if (bum_delta_new == 1)
+  if (bum_delta_new < 100)
     bum_delta_new = bum_delta;
 
   bum_delta = bum_delta_new;
