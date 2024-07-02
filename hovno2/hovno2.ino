@@ -1,15 +1,8 @@
-#include <movingAvg.h>                  // https://github.com/JChristensen/movingAvg
 
-
-
-int DIR_PIN_BT = A2;                        // Direction button 
-int DIR_PIN_OUT = 10;                       // Direction Output
+//int DIR_PIN_OUT = 10;                       // Direction Output
 int HALL_PIN = 2;                           // interrupt feedback pin 
-int PWM_PIN_OUT = 3;                        // 490Hz PWM Output
+int PWM_PIN_OUT = 11;                        // 490Hz PWM Output
 
-
-movingAvg speed_mvavg(10);                // define the moving average object
-movingAvg pot_mvavg(10);                // define the moving average object
 
 int pot;
 
@@ -44,12 +37,21 @@ void setup() {
   pinMode(6,INPUT);                                               
   pinMode(5,INPUT);                                               
 
-  pinMode(A1, INPUT);
-  /* speed pot */
-  pinMode(A7, INPUT);
   
-  pinMode(DIR_PIN_OUT, OUTPUT);                                           // Direction Output
+  /* speed pot */
+  pinMode(A0, INPUT);
+  /* modeswitch pushbutton */
+  pinMode(A1, INPUT);
+  
+  
+  //pinMode(DIR_PIN_OUT, OUTPUT);                                           // Direction Output
   pinMode(PWM_PIN_OUT, OUTPUT);                                           // 490Hz PWM Output
+  
+  
+  /*pinMode(10, OUTPUT);
+  analogWrite(10, 100);*/
+  
+  
   attachInterrupt(digitalPinToInterrupt(HALL_PIN), intrupt, CHANGE);      // Attach Interrupt for motor Hall sensors
 
 }
@@ -86,10 +88,10 @@ void next_state()
     break;  
     case 0:
     {    
-      if (pot <= 500)
-        target = map(pot, 100, 500, 0, 1000);
-      else
-        target = map(pot, 500, 1023, 1000, 200000);
+      /*if (pot <= 500)
+        target = map(pot, 0, 50, 0, 1000);
+      else*/
+        target = map(pot, 0, 1023, 0, 100000);
 
       target = constrain(target, 0, 200000);
 
@@ -125,9 +127,8 @@ void next_state()
 
 void loop() {
 
-  int rrr = analogRead(A7)-10;
+  int rrr = analogRead(A0)-100;
   rrr = constrain(rrr, 0, 1023);
-  //pot = pot_mvavg.reading(rrr);
   pot = rrr;
   
   now = micros();
@@ -152,7 +153,6 @@ interrupts();
   speed = dir * (100000000 / bum_delta - 200); /* cca 200 - 20000 bpk */
   //     2147483648
   speed = constrain((speed * dir), 0, 500000);
-  //speed_mvavg.reading();
   
 
   /* ignore oscillations when wheel is stuck */
@@ -162,6 +162,7 @@ interrupts();
   pid = PID();                                        
   
   analogWrite(PWM_PIN_OUT, constrain(pid,0,255)) ;
+  
   Plotter();                                             
 }
 
@@ -173,7 +174,7 @@ void intrupt(){
   tac = tic;
   tic = micros();
 
-  int new_dir = get_dir();
+  int new_dir = -get_dir();
   if (new_dir != dir)
   {
     last_dir_change = tic;
@@ -200,6 +201,15 @@ int get_dir()
   int d5 = digitalRead(5);
   
   //Serial.print(d7); Serial.print(d6); Serial.print(d5); Serial.println(',');
+  
+  
+  /*
+  hals = d7 | d6 << 2 | d5  << 1;
+hals = d7 << 1 | d6 << 2| d5 ;
+hals = d7 << 1 | d6| d5 << 2 ;
+hals = d7 << 2 | d6| d5 << 1 ;
+hals = d7 << 2 | d6 << 1 | d5;
+*/
   
   hals = d7 << 2 | d6 << 1 | d5;
   
@@ -281,7 +291,6 @@ float PID(){
 
 void Legend()
 {
-//  Serial.println("#pot,target,bum_delta,speed,dir,error,errSum,P,I,D,pid,state");
   Serial.println("##last_dir_change,pot,target,bum_delta,speed,dir,error,errSum,P,I,D,pid,state,hal_magic");
 }
 
