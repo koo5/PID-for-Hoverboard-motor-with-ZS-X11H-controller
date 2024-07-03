@@ -88,10 +88,10 @@ void next_state()
     break;  
     case 0:
     {    
-      /*if (pot <= 500)
-        target = map(pot, 0, 50, 0, 1000);
-      else*/
-        target = map(pot, 0, 1023, 0, 100000);
+      if (pot <= 500)
+        target = map(pot, 0, 500, 0, 1000);
+      else
+        target = map(pot, 500, 1023, 1000, 30000);
 
       target = constrain(target, 0, 200000);
 
@@ -127,7 +127,7 @@ void next_state()
 
 void loop() {
 
-  int rrr = analogRead(A0)-100;
+  int rrr = analogRead(A0)-150;
   rrr = constrain(rrr, 0, 1023);
   pot = rrr;
   
