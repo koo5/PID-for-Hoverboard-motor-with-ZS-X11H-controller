@@ -1,0 +1,2 @@
+ arduino-cli compile --fqbn arduino:avr:nano hovno2.ino;  rsync -av --progress -h build/hovno2.ino.hex pi@10.0.0.159:build/;  ssh pi@10.0.0.159 "bash ~/upload" ; ssh pi@10.0.0.159 "python3 ~/hackery2/data/kst/read.py"
+

@@ -113,10 +113,10 @@ void next_state()
     
       kurva = (pot+constrain((steer+320), -1023, 0));
     
-      int input_thres = 550;
-      int output_thres = 2000;
+      int input_thres = 250;
+      int output_thres = 20000;
       
-      if (pot <= magix)
+      if (pot <= input_thres)
       {
         target = floatmap(kurva, 0, input_thres, 0, output_thres);
       }
@@ -157,12 +157,15 @@ void next_state()
 }
 
 
+long rrr = 0;
+
 void loop() {
 
   /* todo prohodit + a - a dat pullup */
-  int rrr = analogRead(A0);
+  long rrr = analogRead(A0);
   rrr = constrain(rrr, 0, 1023);
-  pot = rrr;
+  pot = (long)((float)pot * 0.8 + (float)rrr * 0.2);
+  
 
   steer1 = analogRead(STEER1);
   steer2 = analogRead(STEER2);
@@ -315,12 +318,12 @@ float PID(){
   P = 0;//0.1 * error;
 
 
-  errSum = errSum + (error * dt/10000000);
+  errSum = errSum + (error * dt/6000000);
   errSum = constrain( errSum, 0, 255 );
   I = errSum;
 
 
-  D = 0.01 * ((error - prevErr) * 10000 / dt);
+  D = 0.02 * ((error - prevErr) * 10000 / dt);
   prevErr = error;
   
   return I + D;
