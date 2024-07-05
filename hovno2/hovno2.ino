@@ -2,9 +2,11 @@
 //int DIR_PIN_OUT = 10;                       // Direction Output
 int HALL_PIN = 2;                           // interrupt feedback pin 
 int PWM_PIN_OUT = 11;                        // 490Hz PWM Output
+int modeswitch_pushbutton = A3;
+int STEER1 = A1;
+int STEER2 = A2;
 
-
-int pot;
+long pot;
 
 unsigned long now, prvTime, dt;
 
@@ -16,6 +18,13 @@ long bum_delta = 0;
 float output = 0;
 long target = 0;
 long speed = 0;
+
+long steer = 0;
+long steer1 = 0;
+long steer2 = 0;
+long kurva = 666;
+
+
 long last_dir_change = 0;
 
 int last_hals = 0;
@@ -39,9 +48,13 @@ void setup() {
 
   
   /* speed pot */
-  pinMode(A0, INPUT);
+  pinMode(A0, INPUT/*INPUT_PULLUP*/);
   /* modeswitch pushbutton */
-  pinMode(A1, INPUT);
+  pinMode(modeswitch_pushbutton, INPUT);
+
+
+  pinMode(STEER1, INPUT_PULLUP);
+  pinMode(STEER2, INPUT_PULLUP);
   
   
   //pinMode(DIR_PIN_OUT, OUTPUT);                                           // Direction Output
@@ -55,6 +68,15 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(HALL_PIN), intrupt, CHANGE);      // Attach Interrupt for motor Hall sensors
 
 }
+
+
+
+
+float floatmap(float x, float in_min, float in_max, float out_min, float out_max) {
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+
 
 int state = 0;
 
@@ -88,14 +110,24 @@ void next_state()
     break;  
     case 0:
     {    
-      if (pot <= 500)
-        target = map(pot, 0, 500, 0, 1000);
+    
+      kurva = (pot+constrain((steer+320), -1023, 0));
+    
+      int input_thres = 550;
+      int output_thres = 2000;
+      
+      if (pot <= magix)
+      {
+        target = floatmap(kurva, 0, input_thres, 0, output_thres);
+      }
       else
-        target = map(pot, 500, 1023, 1000, 30000);
+      {
+        target = floatmap(kurva, input_thres+1, 1023, output_thres, 100000);
+      }
 
       target = constrain(target, 0, 200000);
 
-      /*if (digitalRead(A1) == 0)
+      /*if (digitalRead(modeswitch_pushbutton) == 0)
       {
         target = 0;
         state = 1;
@@ -104,7 +136,7 @@ void next_state()
     break;
     case 1:
     
-    if (digitalRead(A1) == 1)
+    if (digitalRead(modeswitch_pushbutton) == 1)
     {
       target = 0;
       state = 2;
@@ -115,7 +147,7 @@ void next_state()
     {
       state = 0;
     }
-    if (digitalRead(A1) == 0)
+    if (digitalRead(modeswitch_pushbutton) == 0)
     {
       target = bum_delta;
       state = 1;
@@ -127,9 +159,18 @@ void next_state()
 
 void loop() {
 
-  int rrr = analogRead(A0)-150;
+  /* todo prohodit + a - a dat pullup */
+  int rrr = analogRead(A0);
   rrr = constrain(rrr, 0, 1023);
   pot = rrr;
+
+  steer1 = analogRead(STEER1);
+  steer2 = analogRead(STEER2);
+
+  if (steer2 > 512)
+    steer = constrain(steer1 - 1023, -1023, 1023);
+  else
+    steer = constrain(500-steer1   , -1023, 0);
   
   now = micros();
   dt = (now - prvTime); 
@@ -291,7 +332,7 @@ float PID(){
 
 void Legend()
 {
-  Serial.println("##last_dir_change,pot,target,bum_delta,speed,dir,error,errSum,P,I,D,pid,state,hal_magic");
+  Serial.println("##last_dir_change,pot,steer1,steer2,steer,kurva,target,bum_delta,speed,dir,error,errSum,P,I,D,pid,state,hal_magic");
 }
 
 int legend_intersperser = 0;
@@ -306,6 +347,10 @@ void Plotter(){
   //Serial.print(pot);  Serial.print(',');
   Serial.print(last_dir_change);Serial.print(',');
   Serial.print(pot);Serial.print(',');
+  Serial.print(steer1);Serial.print(',');
+  Serial.print(steer2);Serial.print(',');
+  Serial.print(steer);Serial.print(',');
+  Serial.print(kurva);Serial.print(',');
   Serial.print(target);Serial.print(',');
   Serial.print(bum_delta);Serial.print(',');
   Serial.print(speed);Serial.print(',');
